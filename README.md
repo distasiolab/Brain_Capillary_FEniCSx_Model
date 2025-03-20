@@ -6,8 +6,8 @@ A model of oxygen diffusion in human brain based on real cortical microvascular 
 |	README.md
 |	.gitignore
 |
-|_______data
-|	|_______histology image segmentation data (will not be tracked by git, per .gitignore)
+|_______data  (will not be tracked by git, per .gitignore)
+|	|_______histology image segmentation data 
 |	
 |_______src
 |	|_______Analysis source code
@@ -15,7 +15,7 @@ A model of oxygen diffusion in human brain based on real cortical microvascular 
 |_______img
 |	|_______Output images go here
 |
-|_______local
+|_______local  (will not be tracked by git, per .gitignore)
 |	|_______Notebooks
 |
 |_______Scripts
