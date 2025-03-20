@@ -1,14 +1,13 @@
-# ProjectTemplate
-An empty project template to start with. Contains the directory structure:
+# Brain Capillary FEM for O2 Diffusion
+A model of oxygen diffusion in human brain based on real cortical microvascular anatomy 
 
 
 ```
-ProjectName_version
 |	README.md
 |	.gitignore
 |
 |_______data
-|	|_______Put your data here (will not be tracked by git, per .gitignore)
+|	|_______histology image segmentation data (will not be tracked by git, per .gitignore)
 |	
 |_______src
 |	|_______Analysis source code
@@ -16,19 +15,12 @@ ProjectName_version
 |_______img
 |	|_______Output images go here
 |
+|_______local
+|	|_______Notebooks
+|
 |_______Scripts
 |	|_______Some helpful shell scripts
-|
 |
 |_______Docs
 	|_______InfoAboutProject.txt
 
-```
-
-If needed, you may want to add subdirectories for raw data (like *.fastq) and processed data (like matrix files, etc)
-
-```
-mkdir data/raw
-mkdir data/processed
-mkdir ReferenceFiles
-```
