@@ -64,7 +64,7 @@ xdmf.write_function(uh, t)
 
 u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 
-f = fem.Constant(domain, PETSc.ScalarType(0))
+f = fem.Constant(domain, PETSc.ScalarType(1.5))
 
 D = 0.2  # Diffusion coefficient
 a = u * v * ufl.dx + dt * D * ufl.dot(ufl.grad(u), ufl.grad(v)) * ufl.dx

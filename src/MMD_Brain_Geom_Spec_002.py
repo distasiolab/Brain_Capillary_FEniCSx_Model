@@ -48,12 +48,15 @@ gmsh.model.setPhysicalName(2, 1, "Brain")
 gmsh.model.mesh.generate(2)
 
 # Save the mesh to a file
-FILENAME = "MMD_Brain_Geom.msh"
-gmsh.write(FILENAME)
+
+FILEOUTDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),"../data")
+
+FILEPATH = os.path.join("MMD_Brain_Geom.msh")
+gmsh.write(FILEPATH)
 
 # Finalize the GMSH model
 gmsh.finalize()
 
 # Save also as *.xdmf format
-m = meshio.read(FILENAME)
-meshio.write(os.path.splitext(os.path.basename(FILENAME))[0] + ".xdmf", m)
+m = meshio.read(FILEPATH)
+meshio.write(os.path.join(FILEOUTDIR, os.path.splitext(os.path.basename(FILEPATH))[0] + ".xdmf"), m)
