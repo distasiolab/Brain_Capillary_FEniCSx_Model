@@ -1,6 +1,7 @@
 
 # From https://jsdokken.com/dolfinx-tutorial/chapter2/diffusion_code.html
 # DOLFIN is the user interface of the FEniCS project
+import os
 import matplotlib as mpl
 import pyvista
 import numpy as np
@@ -16,8 +17,8 @@ from dolfinx.fem.petsc import assemble_vector, assemble_matrix, create_vector, a
 
 ################################################################################
 # Read the mesh from the XDMF file
+xdmf_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),"../data/MMD_Brain_Geom.xdmf")
 
-xdmf_file = "GMSH/MMD_Brain_Geom.xdmf"
 with io.XDMFFile(MPI.COMM_WORLD, xdmf_file, "r") as xdmf:
     domain = xdmf.read_mesh(name="Grid")
 
@@ -27,8 +28,8 @@ V = fem.functionspace(domain, ("Lagrange", 1))
 
 # Define temporal parameters
 t = 0  # Start time
-T = 1.0  # Final time
-num_steps = 50
+T = 2.0  # Final time
+num_steps = 100
 dt = T / num_steps  # time step size
 
 # Create initial condition
@@ -59,12 +60,9 @@ uh.interpolate(initial_condition)
 xdmf.write_function(uh, t)
 
 
-
-
-
 u, v = ufl.TrialFunction(V), ufl.TestFunction(V)
 
-f = fem.Constant(domain, PETSc.ScalarType(1.5))
+f = fem.Constant(domain, PETSc.ScalarType(0.1))
 
 D = 0.2  # Diffusion coefficient
 a = u * v * ufl.dx + dt * D * ufl.dot(ufl.grad(u), ufl.grad(v)) * ufl.dx
@@ -97,7 +95,10 @@ grid = pyvista.UnstructuredGrid(*plot.vtk_mesh(V))
 
 
 plotter = pyvista.Plotter()
-plotter.open_gif("u_time.gif", fps=10)
+
+IMGOUTDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),"../img")
+
+plotter.open_gif(os.path.join(IMGOUTDIR,"u_time.gif"), fps=10)
 
 grid.point_data["uh"] = uh.x.array
 warped = grid.warp_by_scalar("uh", factor=1)
