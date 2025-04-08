@@ -2,6 +2,9 @@
 data/**
 !data/.gitkeep
 
+img/**
+!img/.gitkeep
+
 local/**
 !local/.gitkeep
 
