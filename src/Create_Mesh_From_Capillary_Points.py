@@ -27,15 +27,15 @@ Region_Meshes = {}
 # Define the holes (circles) in microns
 hole_radius = 10
 
+mesh_size = 1  # Larger values produce a coarser mesh, smaller values produce a finer mesh
 
 for s in Samples.keys():
-    print(s)
 
     filtered_values = Samples[s]['Parent'].str.extract(r'(Layer\d+)')[0].dropna().unique()
     unique_layers = filtered_values.tolist()
 
     for layer in unique_layers:
-        print(layer)
+
         filtered_df = Samples[s][Samples[s]['Parent'].str.match(f'{layer}.*')]
         X =  filtered_df['Centroid X µm'].tolist()
         Y =  filtered_df['Centroid Y µm'].tolist()
@@ -78,15 +78,15 @@ for s in Samples.keys():
     
         surface_tag = gmsh.model.occ.addPlaneSurface([line_loop_tag])
     
-    
         gmsh.model.occ.synchronize()
-    
-        
-        
+
+        n = 1
         for c in internal_capillaries:
+            print(f"Adding capillary {n} of {np.shape(internal_capillaries)[0]} for {s}, {layer}.")
             gmsh.model.occ.addPoint(c[0], c[1], 0)
             h_surface = gmsh.model.occ.addDisk(c[0], c[1], 0, hole_radius, hole_radius)
             gmsh.model.occ.cut([(2, surface_tag)], [(2, h_surface)])
+            n=n+1
         gmsh.model.occ.synchronize()
     
         
