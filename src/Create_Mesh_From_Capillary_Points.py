@@ -2,7 +2,6 @@ import os
 import glob
 import pandas as pd
 import numpy as np
-#from scipy.spatial import ConvexHull
 from alphashape_mmd import alphashape
 import gmsh
 import meshio
@@ -28,7 +27,7 @@ Region_Meshes = {}
 # Define the holes (circles) in microns
 hole_radius = 1
 
-mesh_size = 5  # Larger values produce a coarser mesh, smaller values produce a finer mesh
+mesh_size = 500  # Larger values produce a coarser mesh, smaller values produce a finer mesh
 
 for s in Samples.keys():
 
@@ -47,10 +46,7 @@ for s in Samples.keys():
         # Compute the boundary
         alpha_shape = alphashape(capillary_centers)
         
-        #hull = ConvexHull(capillary_centers)
-
         # Extract the boundary points (indices of points in the hull)
-        #boundary_points = capillary_centers[hull.vertices]
         boundary_points = np.array(list(alpha_shape.exterior.coords))[1:,:]
 
         internal_capillaries = np.array([point for i, point in enumerate(capillary_centers) if i not in boundary_points])

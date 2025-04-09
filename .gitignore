@@ -8,6 +8,8 @@ img/**
 local/**
 !local/.gitkeep
 
+**/__pycache__/*
+
 # Any folder in the project tree called 'ReferenceFiles' is ignored
 ReferenceFiles
 
