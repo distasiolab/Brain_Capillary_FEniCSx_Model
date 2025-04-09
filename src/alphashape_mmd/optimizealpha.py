@@ -110,4 +110,5 @@ def optimizealpha(points: Union[List[Tuple[float]], np.ndarray],
                                 'optimizing the alpha parameter')
             lower = 0.
             break
+    print(f"Optimized alpha: {lower}")
     return lower
