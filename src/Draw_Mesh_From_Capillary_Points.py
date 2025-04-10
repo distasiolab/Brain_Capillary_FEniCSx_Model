@@ -5,6 +5,7 @@ import meshio
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.cm as cm
+from matplotlib.lines import Line2D
 import numpy as np
 
 ##################################################
@@ -97,6 +98,28 @@ for v in mesh_files:
     plt.axis('off')
     plt.legend(loc="upper right", fontsize=8)
     plt.gca().set_aspect('equal')
+
+    # Define where to place the scale bar (adjust as needed)
+    x0 = 0.05  # fraction of axis width (left-right)
+    y0 = 0.05  # fraction of axis height (bottom-top)
+    bar_length = 1000  # in data units
+    bar_label = "1 cm"
+
+    # Get axis limits to compute actual bar position
+    ax = plt.gca()
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    
+    x_start = xlim[0] + x0 * (xlim[1] - xlim[0])
+    y_start = ylim[0] + y0 * (ylim[1] - ylim[0])
+    
+    # Plot the scale bar
+    ax.add_line(Line2D([x_start, x_start + bar_length],
+                   [y_start, y_start], color='black', linewidth=2))
+
+    # Add text label above or below the bar
+    ax.text(x_start + bar_length / 2, y_start - 0.01 * (ylim[1] - ylim[0]),
+        bar_label, ha='center', va='top', fontsize=9)
 
     # Save to PNG
     FILEPATH = os.path.join(datadir, f"{SampleName}.png")
