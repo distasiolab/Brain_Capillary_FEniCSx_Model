@@ -7,7 +7,20 @@ from alphashape_mmd import alphashape
 import gmsh
 import meshio
 
-FILEPATHBASE = '/Users/mmd47/Dropbox-YaleUniversity/Marcello DiStasio/DiStasio Lab/DiStasio Lab Share/02 Analysis/Brain_Oxygen_Simulation/Brain_Capillary_FEniCSx_Model'
+##################################################
+# Base file path definition
+##################################################
+# Define the base path relative to which data is loaded and saved
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('-b', '--basepath', type=str, help='Path to base directory for the project; should contain directories \'data\' and \'calc\'')
+args = parser.parse_args()
+
+if args.basepath:
+    FILEPATHBASE = args.basepath
+else:
+    # Parent directory of this file
+    FILEPATHBASE = os.path.join(os.path.dirname(os.path.abspath(__file__)),'..')
 
 datadir = os.path.join(FILEPATHBASE,'data','Capillary_Locations')
 vessels_files = glob.glob(os.path.join(datadir, '*vessels.csv'))
@@ -139,7 +152,6 @@ for s in Samples.keys():
     FILEPATH = os.path.join(datadir, f"Brain_Geom_{s}")
     gmsh.write(FILEPATH+".msh")
     # Finalize the GMSH model
-    sys.exit(0)
     gmsh.finalize()
     print("Wrote: " + FILEPATH+".msh")
     
