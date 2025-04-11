@@ -1,12 +1,23 @@
 import sys
 import os
 import glob
+
 import pandas as pd
 import numpy as np
-from shapely.geometry import Polygon, MultiPolygon
+
+from shapely.geometry import Polygon, MultiPolygon, Point
 from alphashape_mmd import alphashape
+
 import gmsh
 import meshio
+
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib.cm as cm
+from matplotlib.lines import Line2D
+
+
+
 
 ##################################################
 # Base file path definition
@@ -100,6 +111,8 @@ for s in Samples.keys():
         surface_physical_group_tag = gmsh.model.addPhysicalGroup(2, [surface_tag])
         gmsh.model.setPhysicalName(2, surface_physical_group_tag, "BrainCortex")
         gmsh.model.occ.synchronize()
+
+        boundary_polygon = Polygon(boundary_points)
         
         for layer in unique_layers:
             
@@ -109,13 +122,19 @@ for s in Samples.keys():
             
             # Combine X and Y into a single list of coordinates
             capillary_centers = np.array(list(zip(X, Y)))
-            internal_capillaries = np.array([point for i, point in enumerate(capillary_centers) if i not in boundary_points])
+
+            #internal_capillaries = np.array([point for i, point in enumerate(capillary_centers) if i not in boundary_points])
             
             # Compute the Euclidean distance between each candidate point and all boundary points and only keep those further than threshold
-            distances = np.linalg.norm(boundary_points[:, np.newaxis] - internal_capillaries, axis=2)
-            threshold_distance = 2*hole_radius
-            is_greater_than_threshold = np.all(distances > threshold_distance, axis=0)
-            internal_capillaries = internal_capillaries[is_greater_than_threshold]
+            #distances = np.linalg.norm(boundary_points[:, np.newaxis] - internal_capillaries, axis=2)
+            #threshold_distance = 2*hole_radius
+            #is_greater_than_threshold = np.all(distances > threshold_distance, axis=0)
+            #internal_capillaries = internal_capillaries[is_greater_than_threshold]
+
+            internal_capillaries = np.array([
+                pt for pt in capillary_centers if boundary_polygon.contains(Point(pt))
+            ])
+
             
             n = 1
             cap_points = []
@@ -160,15 +179,107 @@ for s in Samples.keys():
         # Output
         FILEPATH = os.path.join(datadir, f"Brain_Geom_{s}_region_{region_number}")
         gmsh.write(FILEPATH+".msh")
+        print("Wrote: " + FILEPATH+".msh")
+
         # Finalize the GMSH model
         gmsh.finalize()
-        print("Wrote: " + FILEPATH+".msh")
+        
     
         # Also save as *.xdmf format
-        m = meshio.read(FILEPATH+".msh")
-        meshio.write(FILEPATH + ".xdmf", m)
+        mesh = meshio.read(FILEPATH+".msh")
+        meshio.write(FILEPATH + ".xdmf", mesh)
         print("Wrote: " + FILEPATH+".xdmf")
-        #----------------------------------------------------------------------
 
-        region_number = region_number + 1
+
+        #And draw a PNG imge
+        points = mesh.points
+    
+        field_data = mesh.field_data
         
+        # Get vertex cells (these are the point elements)
+        vertex_cells_list = []
+        vertex_tags_list = []
+
+        for i, cell_block in enumerate(mesh.cells):
+            if cell_block.type == "vertex":
+                vertex_cells_list.append(cell_block.data)
+                vertex_tags_list.append(mesh.cell_data["gmsh:physical"][i])
+
+        vertex_cells = np.vstack(vertex_cells_list)
+        vertex_tags = np.concatenate(vertex_tags_list)
+
+        if len(vertex_cells_list) == 0 or len(vertex_tags_list) == 0:
+            raise ValueError("No vertex cells with physical tags found.")
+
+        # Filter physical groups ending with '_capillary' and dimension 0
+        capillary_tags = {name: tag_dim[0] for name, tag_dim in field_data.items()
+                          if name.endswith("_capillary") and tag_dim[1] == 0}
+        # Build tag → point index list
+        tag_to_points = {name: vertex_cells[vertex_tags == int(tag)].flatten()
+                         for name, tag in capillary_tags.items()}
+    
+        # Find triangle elements (usually under 'triangle' or 'triangle3')
+        #triangles = None
+        #for cell_block in mesh.cells:
+        #    if cell_block.type == "triangle":
+        #        triangles = cell_block.data
+        #        break
+        #if triangles is None:
+        #    raise ValueError("No triangular elements found in the mesh.")
+        
+        # Filter only point-based physical names that end in '_capillary'
+        capillary_labels = {name: tag_dim[0] for name, tag_dim in mesh.field_data.items()
+                            if name.endswith("_capillary") and tag_dim[1] == 0}
+
+    
+        # Create a color map
+        cmap = plt.get_cmap("tab10", len(capillary_labels))  # or "tab20" if you have many
+        
+        ## Plot using matplotlib
+        #mpl.rcParams['agg.path.chunksize'] = 102
+        plt.figure(figsize=(15, 15))
+        #plt.triplot(points[:, 0], points[:, 1], triangles, linewidth=0.5)
+        
+        # Plot each capillary group
+        for idx, (name, pt_indices) in enumerate(tag_to_points.items()):
+            if len(pt_indices) == 0:
+                continue
+            color = cmap(idx)
+            plt.plot(points[pt_indices, 0], points[pt_indices, 1],
+                     'o', markersize=0.25, color=color, label=name)
+
+
+
+        plt.axis('off')
+        plt.legend(loc="upper right", fontsize=8)
+        plt.gca().set_aspect('equal')
+
+        # Define where to place the scale bar (adjust as needed)
+        x0 = 0.05  # fraction of axis width (left-right)
+        y0 = 0.05  # fraction of axis height (bottom-top)
+        bar_length = 1000  # in data units
+        bar_label = "1 cm"
+        
+        # Get axis limits to compute actual bar position
+        ax = plt.gca()
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+    
+        x_start = xlim[0] + x0 * (xlim[1] - xlim[0])
+        y_start = ylim[0] + y0 * (ylim[1] - ylim[0])
+    
+        # Plot the scale bar
+        ax.add_line(Line2D([x_start, x_start + bar_length],
+                           [y_start, y_start], color='black', linewidth=2))
+
+        # Add text label above or below the bar
+        ax.text(x_start + bar_length / 2, y_start - 0.01 * (ylim[1] - ylim[0]),
+                bar_label, ha='center', va='top', fontsize=9)
+
+        # Save to PNG
+        plt.savefig(FILEPATH+".png", dpi=600, bbox_inches='tight')
+
+        print("Wrote: " +  FILEPATH+".png")
+        print('Done!')
+        
+        region_number = region_number + 1

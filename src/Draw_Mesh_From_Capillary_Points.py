@@ -33,7 +33,7 @@ for v in mesh_files:
 
     print(f'Drawing map for sample {SampleName} from file {v}...')
     # Load the .msh file
-    mesh = meshio.read(os.path.join(datadir,"Brain_Geom_A22-313.msh"))
+    mesh = meshio.read(os.path.join(datadir, v))
     points = mesh.points
     
     field_data = mesh.field_data
