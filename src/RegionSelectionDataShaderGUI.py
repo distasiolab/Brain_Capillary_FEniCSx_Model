@@ -6,7 +6,8 @@ import holoviews as hv
 import panel as pn
 from holoviews import opts
 from holoviews.operation.datashader import datashade
-import chardet
+from holoviews.streams import Selection1D
+from bokeh.models import ColumnDataSource
 
 
 hv.extension('bokeh')
@@ -48,7 +49,7 @@ def process_file(event):
         df.columns = [col.strip() for col in df.columns]
         df.columns = [col.replace('Âµ', 'µ') for col in df.columns]
         # Print cleaned column names for debugging
-        print("Cleaned column names:")
+        print("Cleaned column names from loaded CSV:")
         print(df.columns.tolist())
 
         
@@ -57,19 +58,33 @@ def process_file(event):
             status.object = "❌ CSV must contain 'Centroid X µm' and 'Centroid Y µm' columns."
             return
 
-        # Step 7: Create a Points object for visualization in HoloViews
-        points = hv.Points(df, kdims=["Centroid X µm", "Centroid Y µm"])
-        selection_stream = hv.streams.Selection1D(source=points)
 
-        # Step 8: Apply datashading to the points for better performance with large datasets
-        shaded = datashade(points).opts(
-            opts.RGB(width=800, height=600, tools=['box_select', 'lasso_select'])
-        )
-        interactive = points.opts(
-            opts.Points(alpha=0, size=1, tools=['box_select', 'lasso_select'])
+        base_points = hv.Points(df, kdims=["Centroid X µm", "Centroid Y µm"]).opts(
+            alpha=0, size=1, tools=['box_select', 'lasso_select']
         )
 
-        plot_pane.object = shaded * interactive
+        # Shaded (visual) points
+        shaded = datashade(base_points).opts(
+            opts.RGB(width=800, height=600)
+        )
+
+        # Selection stream tied to the base (transparent) points
+        selection_stream = Selection1D(source=base_points)
+
+        def get_selected_points(index):
+            if index:
+                selected = df.iloc[index]
+                return hv.Points(selected, kdims=["Centroid X µm", "Centroid Y µm"]).opts(
+                    color='red', size=8
+                )
+            return hv.Points([])
+
+        # Dynamic map to update selected points
+        selected_points = hv.DynamicMap(lambda index: get_selected_points(index), streams=[selection_stream])
+
+        # Compose the plot: shaded + interactive layer + selected points
+        plot_pane.object = shaded * base_points * selected_points
+        
         status.object = "✅ File loaded. Use box/lasso to select points."
 
     except Exception as e:
