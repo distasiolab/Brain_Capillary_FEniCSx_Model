@@ -99,6 +99,7 @@ def export_callback(event):
 
     selected_df = df.iloc[selection_stream.index]
     selected_df.to_csv("selected_points.csv", index=False)
+    
     status.object = f"✅ Exported {len(selected_df)} points to `selected_points.csv`."
 
 export_button.on_click(export_callback)
