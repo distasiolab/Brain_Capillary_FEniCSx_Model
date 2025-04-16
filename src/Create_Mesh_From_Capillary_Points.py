@@ -35,7 +35,7 @@ else:
     FILEPATHBASE = os.path.join(os.path.dirname(os.path.abspath(__file__)),'..')
 
 datadir = os.path.join(FILEPATHBASE,'data','Capillary_Locations')
-vessels_files = glob.glob(os.path.join(datadir, '*vessels.csv'))
+vessels_files = glob.glob(os.path.join(datadir, '*vessels*.csv'))
 
 
 print(f"Loading capillary locations from files in directory {datadir}")
