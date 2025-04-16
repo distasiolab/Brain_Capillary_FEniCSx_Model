@@ -13,17 +13,51 @@ from bokeh.models import ColumnDataSource
 hv.extension('bokeh')
 pn.extension()
 
+def export_callback():
+
+    # Dynamic map to update selected points
+    selected_points = hv.DynamicMap(lambda index: get_selected_points(index), streams=[selection_stream])
+
+    selected_df = df.iloc[selection_stream.index]
+
+    # Build filename
+    base, ext = file_input.filename.rsplit('.', 1)
+    output_filename = f"{base}_selectedregion_{counter['index']}.{ext}"
+    counter['index'] += 1
+    
+    # Save to bytes buffer
+    buffer = io.BytesIO()
+    selected_df.to_csv(buffer, index=False)
+    buffer.seek(0)
+    
+    # Store processed bytes
+    processed_data['bytes'] = buffer.read()
+
+    return io.BytesIO(processed_data['bytes'])
+    
+    status.object = f"✅ Ready to download {len(selected_df)} points"
+
 # Widgets
 file_input = pn.widgets.FileInput(accept='.csv')
-export_button = pn.widgets.Button(name='Export Selected to CSV', button_type='primary')
+
+download_button = pn.widgets.FileDownload(
+    label='Download processed file',
+    button_type='success',
+    auto=False,
+    callback=export_callback
+)
+
 status = pn.pane.Markdown("")
 
 # Display pane for the plot
-plot_pane = pn.pane.HoloViews(height=600)
+plot_pane = pn.pane.HoloViews(height=500)
 
 # State variables
 df = None
 selection_stream = None
+
+counter = {'index': 1}  # Keeps track of the X in selectedregion_X
+processed_data = {'bytes': None}  
 
 def process_file(event):
     global df, selection_stream
@@ -32,7 +66,6 @@ def process_file(event):
         return
 
     try:
-
 
         # Directly read file content (no Base64 decoding)
         decoded_bytes = file_input.value
@@ -87,30 +120,56 @@ def process_file(event):
         
         status.object = "✅ File loaded. Use box/lasso to select points."
 
+        # Build filename
+        base, ext = file_input.filename.rsplit('.', 1)
+        output_filename = f"{base}_selectedregion_{counter['index']}.{ext}"
+        #counter['index'] = counter['index'] + 1
+
+        # Update download button
+        download_button.filename = output_filename
+
+        
     except Exception as e:
         status.object = f"❌ Error loading file: {e}"
 
 file_input.param.watch(process_file, 'value')
 
 def export_callback(event):
-    if df is None or selection_stream is None or not selection_stream.index:
-        status.object = "⚠️ No data or no points selected."
-        return
+
+    # Dynamic map to update selected points
+    selected_points = hv.DynamicMap(lambda index: get_selected_points(index), streams=[selection_stream])
 
     selected_df = df.iloc[selection_stream.index]
-    selected_df.to_csv("selected_points.csv", index=False)
+
+    # Build filename
+    base, ext = file_input.filename.rsplit('.', 1)
+    output_filename = f"{base}_selectedregion_{counter['index']}.{ext}"
+    counter['index'] += 1
+    
+    # Save to bytes buffer
+    buffer = io.BytesIO()
+    selected_df.to_csv(buffer, index=False)
+    buffer.seek(0)
+    
+    # Store processed bytes
+    processed_data['bytes'] = buffer.read()
+    
+    # Update download button
+    download_button.filename = output_filename
+    
+    
     
     status.object = f"✅ Exported {len(selected_df)} points to `selected_points.csv`."
 
-export_button.on_click(export_callback)
+#export_button.on_click(export_callback)
 
 # Layout
 app = pn.Column(
     "## Upload CSV and Select Points",
     file_input,
     plot_pane,
-    export_button,
-    status
+    status,
+    download_button
 )
 
 app.servable()
