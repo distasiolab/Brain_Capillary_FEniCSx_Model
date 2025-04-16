@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib.widgets import PolygonSelector
 from shapely.geometry import Point, Polygon
 from tkinter import Tk, filedialog
@@ -31,7 +32,7 @@ file_path = filedialog.askopenfilename(
 )
 
 if not file_path:
-    print("❌ No file selected.")
+    print("No file selected.")
     exit()
 
 # Load your CSV
@@ -51,11 +52,15 @@ colors = plt.cm.get_cmap("tab10", len(unique_groups))  # Categorical colormap
 group_to_color = {group: colors(i) for i, group in enumerate(unique_groups)}
 
 # Create color array
-point_colors = df[group_col].map(group_to_color)
+
 
 # Plot
+matplotlib.use("TkAgg")
 fig, ax = plt.subplots()
-sc = ax.scatter(df[x_col], df[y_col], c=point_colors, s=10)
+display_df = df.iloc[::10]  # Show 1 in every 10 points
+display_points = display_df[[x_col, y_col]].values
+point_colors = display_df[group_col].map(group_to_color)
+sc = ax.scatter(display_df[x_col], display_df[y_col], c=point_colors, s=10)
 ax.set_title(f"Draw polygon to select points (colored by '{group_col}')")
 
 # Legend

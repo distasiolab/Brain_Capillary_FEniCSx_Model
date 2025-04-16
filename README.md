@@ -24,3 +24,9 @@ A model of oxygen diffusion in human brain based on real cortical microvascular 
 |_______Docs
 	|_______InfoAboutProject.txt
 
+
+Run the GUI with
+
+'''
+panel serve src/RegionSelectionDatShaderGUI.py --show
+'''
