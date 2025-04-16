@@ -41,7 +41,7 @@ vessels_files = glob.glob(os.path.join(datadir, '*vessels*.csv'))
 print(f"Loading capillary locations from files in directory {datadir}")
 Samples = {}
 for v in vessels_files:
-    SampleName = os.path.split(v)[1].split('_')[0] 
+    SampleName = os.path.split(v)[1]
     csv_in = pd.read_csv(v)
     Samples[SampleName] = csv_in.filter(like='Centroid').join(csv_in.filter(like='Parent'))
 
