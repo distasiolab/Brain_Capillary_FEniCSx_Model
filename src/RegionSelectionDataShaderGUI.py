@@ -17,14 +17,10 @@ def export_callback():
 
     # Dynamic map to update selected points
     selected_points = hv.DynamicMap(lambda index: get_selected_points(index), streams=[selection_stream])
-
     selected_df = df.iloc[selection_stream.index]
 
-    # Build filename
-    base, ext = file_input.filename.rsplit('.', 1)
-    output_filename = f"{base}_selectedregion_{counter['index']}.{ext}"
-    counter['index'] += 1
-    
+    status.object = f"✅ Ready to download {len(selected_df)} points"
+
     # Save to bytes buffer
     buffer = io.BytesIO()
     selected_df.to_csv(buffer, index=False)
@@ -33,17 +29,43 @@ def export_callback():
     # Store processed bytes
     processed_data['bytes'] = buffer.read()
 
-    return io.BytesIO(processed_data['bytes'])
     
-    status.object = f"✅ Ready to download {len(selected_df)} points"
+    counter['index'] += 1
 
+    return io.BytesIO(processed_data['bytes'])
+
+
+# Callback function triggered on selection
+def selection_callback(index):
+    if index:
+        selected = df.iloc[index]
+        status.object = f"Selected {len(selected)} points"
+
+        # Build filename
+        base, ext = file_input.filename.rsplit('.', 1)
+        output_filename = f"{base}_selectedregion_{counter['index']}.{ext}"
+        download_button.name = f"Download {output_filename}"
+        download_button.filename = output_filename
+                
+    else:
+        status.object = "No points selected"
+
+    
+#--------------------------------------------------------------------------------
+# State variables
+df = None
+selection_stream = None
+counter = {'index': 1}  # Keeps track of the X in selectedregion_X
+processed_data = {'bytes': None}  
+
+#--------------------------------------------------------------------------------
 # Widgets
 file_input = pn.widgets.FileInput(accept='.csv')
 
 download_button = pn.widgets.FileDownload(
-    label='Download processed file',
+    label='Download',
     button_type='success',
-    auto=False,
+    auto=True,
     callback=export_callback
 )
 
@@ -51,13 +73,6 @@ status = pn.pane.Markdown("")
 
 # Display pane for the plot
 plot_pane = pn.pane.HoloViews(height=500)
-
-# State variables
-df = None
-selection_stream = None
-
-counter = {'index': 1}  # Keeps track of the X in selectedregion_X
-processed_data = {'bytes': None}  
 
 def process_file(event):
     global df, selection_stream
@@ -132,36 +147,11 @@ def process_file(event):
     except Exception as e:
         status.object = f"❌ Error loading file: {e}"
 
+    # Attach the callback
+    selection_stream.add_subscriber(selection_callback)
+
+        
 file_input.param.watch(process_file, 'value')
-
-def export_callback(event):
-
-    # Dynamic map to update selected points
-    selected_points = hv.DynamicMap(lambda index: get_selected_points(index), streams=[selection_stream])
-
-    selected_df = df.iloc[selection_stream.index]
-
-    # Build filename
-    base, ext = file_input.filename.rsplit('.', 1)
-    output_filename = f"{base}_selectedregion_{counter['index']}.{ext}"
-    counter['index'] += 1
-    
-    # Save to bytes buffer
-    buffer = io.BytesIO()
-    selected_df.to_csv(buffer, index=False)
-    buffer.seek(0)
-    
-    # Store processed bytes
-    processed_data['bytes'] = buffer.read()
-    
-    # Update download button
-    download_button.filename = output_filename
-    
-    
-    
-    status.object = f"✅ Exported {len(selected_df)} points to `selected_points.csv`."
-
-#export_button.on_click(export_callback)
 
 # Layout
 app = pn.Column(
