@@ -107,6 +107,8 @@ for s in Samples.keys():
         gmsh.model.occ.synchronize()
         surface_tag = gmsh.model.occ.addPlaneSurface([line_loop_tag])
         gmsh.model.occ.synchronize()
+        gmsh.model.mesh.setRecombine(2, surface_tag, False)  # Explicitly forbid recombination
+        gmsh.model.occ.synchronize()
         
         surface_physical_group_tag = gmsh.model.addPhysicalGroup(2, [surface_tag])
         gmsh.model.setPhysicalName(2, surface_physical_group_tag, "BrainCortex")
@@ -122,14 +124,6 @@ for s in Samples.keys():
             
             # Combine X and Y into a single list of coordinates
             capillary_centers = np.array(list(zip(X, Y)))
-
-            #internal_capillaries = np.array([point for i, point in enumerate(capillary_centers) if i not in boundary_points])
-            
-            # Compute the Euclidean distance between each candidate point and all boundary points and only keep those further than threshold
-            #distances = np.linalg.norm(boundary_points[:, np.newaxis] - internal_capillaries, axis=2)
-            #threshold_distance = 2*hole_radius
-            #is_greater_than_threshold = np.all(distances > threshold_distance, axis=0)
-            #internal_capillaries = internal_capillaries[is_greater_than_threshold]
 
             internal_capillaries = np.array([
                 pt for pt in capillary_centers if boundary_polygon.contains(Point(pt))
@@ -148,10 +142,8 @@ for s in Samples.keys():
                 n=n+1
             gmsh.model.occ.synchronize()
             
-
-            mesh_size = 1 #in microns
-            #points = gmsh.model.getEntities(dim=0)  # Get points (dim=0 for points)
             ## Set  mesh size for each corner point
+            mesh_size = 1 #in microns
             for point in cap_points:
                 gmsh.model.mesh.setSize([(0, point)], mesh_size)
             
@@ -172,6 +164,10 @@ for s in Samples.keys():
 
         #----------------------------------------------------------------------
         # Generate mesh
+        gmsh.option.setNumber("Mesh.RecombineAll", 0)         # Make sure no quads
+        gmsh.option.setNumber("Mesh.RecombinationAlgorithm", -1)  
+        gmsh.option.setNumber("Mesh.Algorithm", 6)            # Frontal-Delaunay (triangle-favoring)
+        gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 0) # Do not use the Blossom recombination algorithm, which results in quads, which dolfinx doesn't like
         gmsh.model.mesh.generate(2)
         #----------------------------------------------------------------------
         
@@ -184,13 +180,35 @@ for s in Samples.keys():
         # Finalize the GMSH model
         gmsh.finalize()
         
-    
+        #----------------------------------------------------------------------
         # Also save as *.xdmf format
+        
         mesh = meshio.read(FILEPATH+".msh")
+
+        # Keep only triangle and vertex cells
+        filtered_cells = []
+        filtered_cell_data = []
+        for cell_block, data in zip(mesh.cells, mesh.cell_data["gmsh:physical"]):
+            if cell_block.type in ["triangle", "vertex"]:
+                filtered_cells.append(cell_block)
+                filtered_cell_data.append(data)
+            else:
+                print(f"Found a cell with type {cell_block.type}")
+
+        mesh.cells = filtered_cells
+        mesh.cell_data = {"gmsh:physical": filtered_cell_data}
+
+        for cell_block, data in zip(mesh.cells, mesh.cell_data["gmsh:physical"]):
+            if cell_block.type in ["triangle", "vertex"]:
+                pass
+            else:
+                print(f"After filtering, found a cell with type {cell_block.type}")
+
+                
         meshio.write(FILEPATH + ".xdmf", mesh)
         print("Wrote: " + FILEPATH+".xdmf")
 
-
+        #----------------------------------------
         #And draw a PNG imge
         points = mesh.points
     
