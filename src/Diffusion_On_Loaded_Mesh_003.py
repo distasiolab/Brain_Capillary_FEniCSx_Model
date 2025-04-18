@@ -16,16 +16,25 @@ from dolfinx.fem.petsc import assemble_vector, assemble_matrix, create_vector, a
 
 
 ################################################################################
-# Read the mesh from the XDMF file
-xdmf_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),"..", "data", "Capillary_Locations", "Brain_Geom_A22-313_vessels_selectedregion_3.csv_region_1.xdmf")
+# Read the mesh from the XDMF file and capillary locations from NPZ file
+xdmf_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),"..", "data", "Capillary_Locations", "Brain_Geom_A22-313_vessels_selectedregion_3.csv_region_1_mesh.xdmf")
 
-print(f"Loading mesh from XDMF file {xdmf_file}")
+npz_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),"..", "data", "Capillary_Locations", "Brain_Geom_A22-313_vessels_selectedregion_3.csv_region_1_points.npz")
+
+print(f"Loading triangle mesh from XDMF file {xdmf_file}")
 with io.XDMFFile(MPI.COMM_WORLD, xdmf_file, "r") as xdmf:
     domain = xdmf.read_mesh(name="Grid")
 print('Done.')
-V = fem.functionspace(domain, ("Lagrange", 1))
-################################################################################
 
+print(f"Loading points from NPZ file {npz_file}")
+data = np.load(npz_file)
+source_coords = data["coords"]
+capillary_centers = source_coords[:,0:1]
+
+################################################################################
+# Setup
+
+V = fem.functionspace(domain, ("Lagrange", 1))
 
 # Define temporal parameters
 t = 0  # Start time
@@ -33,63 +42,33 @@ T = 2.0  # Final time
 num_steps = 100
 dt = T / num_steps  # time step size
 
-#--------------------------------------------------------------------------------
-print("Processing capillary locatons...")
-# Process capillary locations from mesh
-points = mesh.points
-field_data = mesh.field_data
-# Get vertex cells (these are the point elements)
-vertex_cells_list = []
-vertex_tags_list = []
-for i, cell_block in enumerate(mesh.cells):
-    if cell_block.type == "vertex":
-        vertex_cells_list.append(cell_block.data)
-        vertex_tags_list.append(mesh.cell_data["gmsh:physical"][i])
-
-if len(vertex_cells_list) == 0 or len(vertex_tags_list) == 0:
-    print("No vertex cells with physical tags found. Exiting.")
-    sys.exit(0)
-else:
-    vertex_cells = np.vstack(vertex_cells_list)
-    vertex_tags = np.concatenate(vertex_tags_list)
-    
-    # Filter physical groups ending with '_capillary' and dimension 0
-    capillary_tags = {name: tag_dim[0] for name, tag_dim in field_data.items()
-                      if name.endswith("_capillary") and tag_dim[1] == 0}
-    # Build tag → point index list
-    tag_to_points = {name: vertex_cells[vertex_tags == int(tag)].flatten()
-                     for name, tag in capillary_tags.items()}
-    
-    # Filter only point-based physical names that end in '_capillary'
-    capillary_labels = {name: tag_dim[0] for name, tag_dim in mesh.field_data.items()
-                        if name.endswith("_capillary") and tag_dim[1] == 0}
-    centers_x = []
-    centers_y = []
-    for idx, (name, pt_indices) in enumerate(tag_to_points.items()):
-        if len(pt_indices) == 0:
-            continue
-        points[pt_indices, 0]
-
-print('Done')
-
 # Create initial condition
-def initial_condition(x, sigma=0.1, magnitude=0.1):
-    x = np.array(x)
-    centers = np.stack([centers_x, centers_y], axis=-1)
-    x_diff = centers - x  # Difference from the point to each center
 
-    # Handle element-wise sigma and amplitude
-    sigma = np.asarray(sigma)
-    amplitude = np.asarray(magnitude)
-    if sigma.ndim == 0:
-        sigma = np.full(len(centers_x), sigma)
-    if amplitude.ndim == 0:
-        amplitude = np.full(len(centers_x), amplitude)
+def initial_condition(V, sigma=50.0, amplitude=1.0):
+    """
+    Create an initial condition as a sum of Gaussians centered at capillary_centers.
 
-    distances_squared = np.sum(x_diff**2, axis=1)
-    gaussians = amplitude * np.exp(-distances_squared / (2 * sigma**2))
+    Args:
+        V: dolfinx fem.FunctionSpace
+        sigma: float, standard deviation of each Gaussian
+        amplitude: float, peak value of each Gaussian
 
-    return np.sum(gaussians)
+    Returns:
+        fem.Function defined on V
+    """
+    x = ufl.SpatialCoordinate(V.mesh)
+    u_expr = 0
+
+    for c in capillary_centers:
+        dx = x[0] - c[0]
+        dy = x[1] - c[1]
+        u_expr += amplitude * ufl.exp(-(dx*dx + dy*dy)/(sigma**2))
+
+    u0 = fem.Function(V)
+    u0.interpolate(fem.Expression(u_expr, V.element.interpolation_points()))
+    return u0
+
+
 
 print("Setting up initial conditions...")
 u_n = fem.Function(V)

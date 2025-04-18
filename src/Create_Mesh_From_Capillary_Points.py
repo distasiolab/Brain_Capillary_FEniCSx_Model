@@ -28,6 +28,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-b', '--basepath', type=str, help='Path to base directory for the project; should contain directories \'data\' and \'calc\'')
 args = parser.parse_args()
 
+
+
 if args.basepath:
     FILEPATHBASE = args.basepath
 else:
@@ -37,6 +39,47 @@ else:
 datadir = os.path.join(FILEPATHBASE,'data','Capillary_Locations')
 vessels_files = glob.glob(os.path.join(datadir, '*vessels*.csv'))
 
+
+
+
+######################################################################
+# Method definitions
+######################################################################
+def export_only_triangles(mesh, output_filename):
+    # Keep only triangles and vertices
+    keep_types = {"triangle"}
+    filtered_cells = []
+    filtered_cell_data = []
+    for cell_block, data in zip(mesh.cells, mesh.cell_data.get("gmsh:physical", [])):
+        if cell_block.type in keep_types:
+            filtered_cells.append(cell_block)
+            filtered_cell_data.append(data)
+            
+    mesh.cells = filtered_cells
+    mesh.cell_data = {"gmsh:physical": filtered_cell_data}
+
+    meshio.write(output_filename, mesh)
+    print("Wrote: " + output_filename)
+
+def export_point_markers(mesh, filename):
+    vertices = []
+    tags = []
+
+    for cell_block, data in zip(mesh.cells, mesh.cell_data.get("gmsh:physical", [])):
+        if cell_block.type == "vertex":
+            for i, node in enumerate(cell_block.data):
+                coord = mesh.points[node[0]]
+                tag_val = data[i]
+                vertices.append(coord)
+                tags.append(tag_val)
+
+    np.savez(filename, coords=np.array(vertices), tags=np.array(tags))
+    print("Wrote: " + filename)
+
+        
+################################################################################
+# Main method
+################################################################################
 
 print(f"Loading capillary locations from files in directory {datadir}")
 Samples = {}
@@ -107,8 +150,6 @@ for s in Samples.keys():
         gmsh.model.occ.synchronize()
         surface_tag = gmsh.model.occ.addPlaneSurface([line_loop_tag])
         gmsh.model.occ.synchronize()
-        gmsh.model.mesh.setRecombine(2, surface_tag, False)  # Explicitly forbid recombination
-        gmsh.model.occ.synchronize()
         
         surface_physical_group_tag = gmsh.model.addPhysicalGroup(2, [surface_tag])
         gmsh.model.setPhysicalName(2, surface_physical_group_tag, "BrainCortex")
@@ -167,10 +208,17 @@ for s in Samples.keys():
         gmsh.option.setNumber("Mesh.RecombineAll", 0)         # Make sure no quads
         gmsh.option.setNumber("Mesh.RecombinationAlgorithm", -1)  
         gmsh.option.setNumber("Mesh.Algorithm", 6)            # Frontal-Delaunay (triangle-favoring)
-        gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 0) # Do not use the Blossom recombination algorithm, which results in quads, which dolfinx doesn't like
         gmsh.model.mesh.generate(2)
         #----------------------------------------------------------------------
-        
+
+        types, elementTags, nodeTags = gmsh.model.mesh.getElements(dim=2)
+        for i, t in enumerate(types):
+            if gmsh.model.mesh.getElementProperties(t)[0] == "Quadrangle":
+                 print(f"Found {len(elementTags[i])} quad(s):")
+                 for e, tag in enumerate(elementTags[i]):
+                     print(f"  Quad #{e+1}: tag={tag}, node tags={nodeTags[i][e * numNodes: (e + 1) * numNodes]}")
+
+                
         #----------------------------------------------------------------------
         # Output
         FILEPATH = os.path.join(datadir, f"Brain_Geom_{s}_region_{region_number}")
@@ -181,35 +229,15 @@ for s in Samples.keys():
         gmsh.finalize()
         
         #----------------------------------------------------------------------
-        # Also save as *.xdmf format
-        
+        # Also save mesh as *.xdmf format (for loading with dolfinx) and points to npz
         mesh = meshio.read(FILEPATH+".msh")
-
-        # Keep only triangle and vertex cells
-        filtered_cells = []
-        filtered_cell_data = []
-        for cell_block, data in zip(mesh.cells, mesh.cell_data["gmsh:physical"]):
-            if cell_block.type in ["triangle", "vertex"]:
-                filtered_cells.append(cell_block)
-                filtered_cell_data.append(data)
-            else:
-                print(f"Found a cell with type {cell_block.type}")
-
-        mesh.cells = filtered_cells
-        mesh.cell_data = {"gmsh:physical": filtered_cell_data}
-
-        for cell_block, data in zip(mesh.cells, mesh.cell_data["gmsh:physical"]):
-            if cell_block.type in ["triangle", "vertex"]:
-                pass
-            else:
-                print(f"After filtering, found a cell with type {cell_block.type}")
-
-                
-        meshio.write(FILEPATH + ".xdmf", mesh)
-        print("Wrote: " + FILEPATH+".xdmf")
+        export_only_triangles(mesh, FILEPATH+"_mesh.xdmf")
+        mesh = meshio.read(FILEPATH+".msh")
+        export_point_markers(mesh, FILEPATH+"_points.npz")    
 
         #----------------------------------------
         #And draw a PNG imge
+        mesh = meshio.read(FILEPATH+".msh")
         points = mesh.points
     
         field_data = mesh.field_data
