@@ -90,10 +90,6 @@ for v in vessels_files:
 
 Region_Meshes = {}
 
-
-# Define the size of a capillary lumen ('hole') (circles) in microns
-hole_radius = 5
-
 for s in Samples.keys():
 
     print(f"Loading data for sample {s} ...")
@@ -178,8 +174,6 @@ for s in Samples.keys():
                     print(f"Adding capillary {n} of {np.shape(internal_capillaries)[0]} for {s}, {layer}, region {region_number}.")
                 cp = gmsh.model.occ.addPoint(c[0], c[1], 0)
                 cap_points.append(cp)            
-                #h_surface = gmsh.model.occ.addDisk(c[0], c[1], 0, hole_radius, hole_radius)
-                #gmsh.model.occ.cut([(2, surface_tag)], [(2, h_surface)])
                 n=n+1
             gmsh.model.occ.synchronize()
             
