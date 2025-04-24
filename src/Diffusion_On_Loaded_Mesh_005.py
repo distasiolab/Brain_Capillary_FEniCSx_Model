@@ -35,8 +35,8 @@ capillary_centers = np.hstack(( source_coords[:,0:2], np.zeros((source_coords.sh
 
 ############################################################
 # MMD TMP
-random_indices = np.random.choice(capillary_centers.shape[0], size=int(np.floor(capillary_centers.shape[0]/50)), replace=False)
-capillary_centers = capillary_centers[random_indices,:]
+#random_indices = np.random.choice(capillary_centers.shape[0], size=int(np.floor(capillary_centers.shape[0]/10)), replace=False)
+#capillary_centers = capillary_centers[random_indices,:]
 
 ############################################################
 
@@ -87,14 +87,6 @@ dof_indices = np.unique(dof_indices)  # Remove duplicates
 # Use these indices for Dirichlet BCs
 dofs = dof_indices
 
-#def point_locator(x):
-#    # x: shape (gdim, num_points)
-#    # Return a boolean array indicating which columns are close to any of your points
-#    return np.any([np.all(np.isclose(x.T, p, atol=1e2), axis=1) for p in capillary_centers], axis=0)
-
-#dofs = locate_dofs_geometrical(V, point_locator)
-
-
 print(f"Number of Dirichlet BC DOFs: {len(dofs)}")
 
 
@@ -127,15 +119,18 @@ v = ufl.TestFunction(V)
 u_n = fem.Function(V)  # Previous time step
 
 # Parameters
-dt = 0.01
+dt = 0.01        # Your time step size
 alpha = 10000.0
+beta = 8.0  # Define sink rate (positive value)
 
 # UFL constants
 dt_ufl = fem.Constant(domain, dt)
 alpha_ufl = fem.Constant(domain, alpha)
+beta_ufl = fem.Constant(domain, PETSc.ScalarType(beta))
+
 
 # Variational form for backward Euler
-a = (u * v / dt_ufl + alpha_ufl * ufl.dot(ufl.grad(u), ufl.grad(v))) * ufl.dx
+a = (u * v / dt_ufl + alpha_ufl * ufl.dot(ufl.grad(u), ufl.grad(v)) + beta_ufl * u * v) * ufl.dx
 L = (u_n * v / dt_ufl) * ufl.dx
 
 # Compile forms
@@ -176,16 +171,13 @@ grid.set_active_scalars("u")
 # Create plotter
 plotter = pv.Plotter()
 mesh_actor = plotter.add_mesh(grid, clim=[u_values.min(), u_values.max()])
-
+plotter.view_xy()
 plotter.open_movie("heat_equation.mp4", framerate=20)  # Set your desired filename and FPS
 plotter.show(auto_close=False)  # Keeps the window open for updates
 
 u_new = fem.Function(V)
 
-import time  # For optional pause
-
-num_steps = 100  # Set your number of time steps
-dt = 0.01        # Your time step size
+num_steps = 200  # Set your number of time steps
 t = 0.0
 
 for step in range(num_steps):
