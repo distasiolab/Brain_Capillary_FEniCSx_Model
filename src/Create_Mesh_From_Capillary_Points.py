@@ -178,7 +178,7 @@ for s in Samples.keys():
             gmsh.model.occ.synchronize()
             
             ## Set  mesh size for each corner point
-            mesh_size = 1 #in microns
+            mesh_size = 10 #in microns
             for point in cap_points:
                 gmsh.model.mesh.setSize([(0, point)], mesh_size)
             
@@ -193,9 +193,8 @@ for s in Samples.keys():
 
         #----------------------------------------------------------------------
         # Set mesh size
-        #gmsh.option.setNumber("Mesh.CharacteristicLengthMax", (np.max(X)-np.min(X))/100)  # Maximum element size
         #gmsh.option.setNumber("Mesh.CharacteristicLengthMin", 1)
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", 3) #in microns
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", 30) #in microns
 
         #----------------------------------------------------------------------
         # Generate mesh

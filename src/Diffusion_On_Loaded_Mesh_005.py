@@ -1,4 +1,4 @@
-import os
+import sys, os
 import dolfinx
 from dolfinx import io, fem
 from dolfinx.mesh import CellType as dfx_CellType
@@ -12,8 +12,10 @@ import numpy as np
 from mpi4py import MPI
 from petsc4py import PETSc
 
+import pyvista
+pyvista.start_xvfb()
+pyvista.OFF_SCREEN = True
 import pyvista as pv
-
 
 ################################################################################
 # Read the mesh from the XDMF file and capillary locations from NPZ file
@@ -33,7 +35,8 @@ capillary_centers = source_coords[:,0:1]
 
 ############################################################
 # MMD TMP
-capillary_centers = capillary_centers[1:10,:]
+random_indices = np.random.choice(capillary_centers.shape[0], size=int(np.floor(capillary_centers.shape[0]/50)), replace=False)
+capillary_centers = capillary_centers[random_indices,:]
 
 ############################################################
 
@@ -87,7 +90,7 @@ def sinusoid_value(t, amplitude=1.0, frequency=1.0):
 
 # At each time step:
 t = 0.0
-amplitude = 1.0
+amplitude = 5.0
 frequency = 1.0
 
 # Create a Function for the BC values
@@ -159,8 +162,9 @@ grid.set_active_scalars("u")
 # Create plotter
 plotter = pv.Plotter()
 mesh_actor = plotter.add_mesh(grid, clim=[u_values.min(), u_values.max()])
-plotter.show(auto_close=False)  # Keeps the window open for updates
 
+plotter.open_movie("heat_equation.mp4", framerate=20)  # Set your desired filename and FPS
+plotter.show(auto_close=False)  # Keeps the window open for updates
 
 u_new = fem.Function(V)
 
@@ -201,8 +205,10 @@ for step in range(num_steps):
     plotter.update_scalars(u_values, mesh=grid, render=True)
     plotter.add_text(f"time: {t:.3f}", font_size=12, name="timelabel")
 
-    # Optional: slow down the animation
-    time.sleep(0.05)
+    plotter.write_frame()
 
 # Optionally, keep the plot open at the end
-plotter.show(auto_close=False)
+plotter.close()
+
+print('Complete!')
+sys.exit(0)
