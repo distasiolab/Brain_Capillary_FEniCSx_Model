@@ -171,6 +171,8 @@ dt = 0.01        # Your time step size
 t = 0.0
 
 for step in range(num_steps):
+
+    print(f"Time: {t}")
     # Update time
     t += dt
 
