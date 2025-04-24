@@ -31,7 +31,7 @@ print('Done.')
 print(f"Loading points from NPZ file {npz_file}")
 data = np.load(npz_file)
 source_coords = data["coords"]
-capillary_centers = source_coords[:,0:1]
+capillary_centers = np.hstack(( source_coords[:,0:2], np.zeros((source_coords.shape[0], 1)) ))
 
 ############################################################
 # MMD TMP
@@ -74,24 +74,38 @@ V = dolfinx.fem.functionspace(mesh, ufl_element)
 # Define boundary conditions (dirichelet), as time varying point sources at capillary
 # locations
 #--------------------------------------------------------------------------------
+from scipy.spatial import cKDTree
+
+# Get mesh node coordinates
+dof_coords = V.tabulate_dof_coordinates()
+
+# Find closest mesh node to each capillary center
+tree = cKDTree(dof_coords)
+_, dof_indices = tree.query(capillary_centers)
+dof_indices = np.unique(dof_indices)  # Remove duplicates
+
+# Use these indices for Dirichlet BCs
+dofs = dof_indices
+
+#def point_locator(x):
+#    # x: shape (gdim, num_points)
+#    # Return a boolean array indicating which columns are close to any of your points
+#    return np.any([np.all(np.isclose(x.T, p, atol=1e2), axis=1) for p in capillary_centers], axis=0)
+
+#dofs = locate_dofs_geometrical(V, point_locator)
 
 
-def point_locator(x):
-    # x: shape (gdim, num_points)
-    # Return a boolean array indicating which columns are close to any of your points
-    return np.any([np.all(np.isclose(x.T, p, atol=1e-8), axis=1) for p in capillary_centers], axis=0)
+print(f"Number of Dirichlet BC DOFs: {len(dofs)}")
 
-
-dofs = locate_dofs_geometrical(V, point_locator)
 
 def sinusoid_value(t, amplitude=1.0, frequency=1.0):
-    return lambda x: amplitude * np.sin(2 * np.pi * frequency * t) * np.ones(x.shape[1])
+    return lambda x: amplitude * np.sin(2 * np.pi * frequency * t) * np.ones(x.shape[1]) + amplitude
 
 
 # At each time step:
 t = 0.0
 amplitude = 5.0
-frequency = 1.0
+frequency = 2.0
 
 # Create a Function for the BC values
 print(f"Creating boundary conditions at points...")
@@ -114,7 +128,7 @@ u_n = fem.Function(V)  # Previous time step
 
 # Parameters
 dt = 0.01
-alpha = 1.0
+alpha = 10000.0
 
 # UFL constants
 dt_ufl = fem.Constant(domain, dt)
