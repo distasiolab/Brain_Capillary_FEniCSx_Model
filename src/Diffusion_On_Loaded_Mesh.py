@@ -93,11 +93,48 @@ print(f"Number of Dirichlet BC DOFs: {len(dofs)}")
 def sinusoid_value(t, amplitude=1.0, frequency=1.0):
     return lambda x: amplitude * np.sin(2 * np.pi * frequency * t) * np.ones(x.shape[1]) + amplitude
 
+def smooth_pulse_value(t, amplitude=1.0, frequency=1.0, flat_fraction=0.75):
+    """
+    Generalized smooth periodic pulse function.
+    
+    Parameters
+    ----------
+    t : float or numpy array
+        Time input(s), in seconds.
+    amplitude : float
+        Height of the bump.
+    frequency : float
+        Number of cycles per second 
+    flat_fraction : float
+        Fraction of the period that is flat before the bump (0 < flat_fraction < 1).
+    
+    Returns
+    -------
+    f : float or numpy array
+        Output of the function at time t.
+    """
+
+    period = 1 / frequency
+    
+    t_mod = np.mod(t, period)  # Make it periodic
+    flat_duration = flat_fraction * period
+    bump_duration = period - flat_duration
+    
+    f = np.zeros_like(t_mod)
+
+    # Apply cosine bump for the non-flat part
+    mask = t_mod >= flat_duration
+    t_bump = t_mod[mask] - flat_duration
+    f[mask] = amplitude * 0.5 * (1 - np.cos(2 * np.pi * t_bump / bump_duration))
+    
+    return f
+
+
 
 # At each time step:
 t = 0.0
 amplitude = 5.0
-frequency = 2.0
+frequency = 1.0
 
 # Create a Function for the BC values
 print(f"Creating boundary conditions at points...")
